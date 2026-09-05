@@ -81,6 +81,22 @@ npx tsc -p tsconfig.json        # outputs backend/public/app.js
 
 Then open `http://localhost:8080` (mobile-width friendly).
 
+## Deploy to GitHub Pages
+
+The same Rust engine is compiled to **WebAssembly** and runs entirely in the
+browser, so the site is fully static — no server needed on Pages.
+
+```bash
+./build.sh                      # → backend/public/{index.html,app.js,p2h.wasm}
+./deploy.sh <owner>/<repo> gh-pages   # publishes backend/public/ to gh-pages
+```
+
+Enable Pages on the repo → branch `gh-pages` → root.
+
+**Live demo:** <https://fle42058-cyber.github.io/press-to-handstand/>
+
+
+
 ## API
 
 | Method | Path            | Description                                          |
