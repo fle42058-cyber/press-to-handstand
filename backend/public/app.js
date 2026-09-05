@@ -18,8 +18,11 @@ async function makeWasmBackend() {
         const resp = await fetch("p2h.wasm");
         if (!resp.ok)
             return null;
-        const mod = await WebAssembly.instantiateStreaming(resp, {});
-        const e = mod.instance.exports;
+        // Use arrayBuffer + instantiate (robust on Pages: handles any MIME/encoding,
+        // unlike instantiateStreaming).
+        const bytes = await resp.arrayBuffer();
+        const { instance } = await WebAssembly.instantiate(bytes, {});
+        const e = instance.exports;
         const read = (fn) => {
             const ptr = fn();
             const len = e.p2h_out_len();
@@ -27,19 +30,20 @@ async function makeWasmBackend() {
         };
         useWasm = true;
         return {
-            load: async () => { e.p2h_init(1337); e.p2h_run(700); },
+            load: async () => { e.p2h_init(1337n); e.p2h_run(150n); }, // u64 ⇒ BigInt
             meta: async () => JSON.parse(read(() => e.p2h_meta())),
             state: async () => JSON.parse(read(() => e.p2h_state())),
             recommend: async (caps) => {
                 const n = 8;
-                const ptr = e.p2h_alloc_f32(n);
+                const ptr = e.p2h_alloc_f32(n); // pointer/len are i32 ⇒ Number fine
                 new Float32Array(e.memory.buffer, ptr, n).set(caps);
                 return JSON.parse(read(() => e.p2h_recommend(ptr, n)));
             },
-            warm: (n) => e.p2h_run(n),
+            warm: (n) => e.p2h_run(BigInt(n)), // u64 ⇒ BigInt
         };
     }
-    catch (_) {
+    catch (err) {
+        console.error("wasm backend failed, falling back to HTTP:", err);
         useWasm = false;
         return null;
     }
@@ -66,7 +70,6 @@ function el(tag, cls) { const e = document.createElement(tag); if (cls)
 function fmtPct(x) { return Math.round(x * 100) + "%"; }
 // ---------- canvas line chart ----------
 function drawLine(cv, data, opts) {
-    var _a, _b;
     const dpr = window.devicePixelRatio || 1;
     const w = cv.clientWidth || 520, h = cv.clientHeight || 180;
     cv.width = w * dpr;
@@ -78,7 +81,7 @@ function drawLine(cv, data, opts) {
     const n = data.length;
     if (n < 2)
         return;
-    let mn = (_a = opts.min) !== null && _a !== void 0 ? _a : Math.min(...data), mx = (_b = opts.max) !== null && _b !== void 0 ? _b : Math.max(...data);
+    let mn = opts.min ?? Math.min(...data), mx = opts.max ?? Math.max(...data);
     if (mx - mn < 1e-6) {
         mx = mn + 1;
     }
@@ -139,13 +142,12 @@ function buildSliders() {
     const host = $("sliders");
     host.innerHTML = "";
     meta.capacities.forEach((c, i) => {
-        var _a, _b;
         const row = el("div", "sliderrow");
         const top = el("div", "top");
         const name = el("div", "name");
         name.textContent = c.name;
         const val = el("div", "val");
-        val.textContent = Math.round(((_a = curCaps[i]) !== null && _a !== void 0 ? _a : 0.5) * 100) + "%";
+        val.textContent = Math.round((curCaps[i] ?? 0.5) * 100) + "%";
         top.append(name, val);
         const hint = el("div", "hint");
         hint.textContent = c.hint;
@@ -153,7 +155,7 @@ function buildSliders() {
         input.type = "range";
         input.min = "0";
         input.max = "100";
-        input.value = String(Math.round(((_b = curCaps[i]) !== null && _b !== void 0 ? _b : 0.5) * 100));
+        input.value = String(Math.round((curCaps[i] ?? 0.5) * 100));
         input.style.setProperty("--p", input.value + "%");
         input.oninput = () => { curCaps[i] = Number(input.value) / 100; val.textContent = input.value + "%"; input.style.setProperty("--p", input.value + "%"); };
         row.append(top, hint, input);
@@ -200,8 +202,7 @@ function renderPlan(d) {
     const last = d.trace[d.trace.length - 1] || d.finalAttainment;
     const startAvg = d.startAttainment || 0.3;
     meta.capacities.forEach((c, i) => {
-        var _a;
-        const start = (_a = d.caps[i]) !== null && _a !== void 0 ? _a : 0.5;
+        const start = d.caps[i] ?? 0.5;
         const growth = (last - startAvg) / Math.max(0.001, 1 - startAvg);
         const end = Math.min(0.95, start + (1 - start) * Math.max(0, growth));
         const row = el("div", "caprow");
@@ -233,13 +234,16 @@ async function init() {
     setupNav();
     curCaps = [0.55, 0.5, 0.5, 0.45, 0.5, 0.5, 0.45, 0.5];
     // Choose engine: Rust→WebAssembly in the browser, else the Rust HTTP server.
-    const wasmBackend = await makeWasmBackend();
-    backend = wasmBackend !== null && wasmBackend !== void 0 ? wasmBackend : makeHttpBackend();
-    await backend.load();
     try {
+        const wasmBackend = await makeWasmBackend();
+        backend = wasmBackend ?? makeHttpBackend();
+        await backend.load();
         meta = await backend.meta();
     }
-    catch (_) { }
+    catch (err) {
+        console.error("engine init failed:", err);
+        backend = makeHttpBackend(); // last-resort fallback
+    }
     if (!meta) {
         meta = { capacities: [], skills: [], weeks: 36, threshold: 0.8, goal: 9, goalName: "Full press to handstand" };
     }
@@ -248,10 +252,20 @@ async function init() {
     evolTimer = window.setInterval(pollEvolution, 900);
     $("btnRecompute").onclick = recommend;
     // In wasm mode the GA runs in-browser; nudge it forward so the fitness curve
-    // keeps climbing, and re-plan periodically.
+    // keeps climbing without freezing the UI (run in small chunks).
     if (useWasm) {
-        window.setInterval(() => { backend.warm(40); pollEvolution(); }, 2500);
+        window.setInterval(() => { try {
+            backend.warm(25);
+            pollEvolution();
+        }
+        catch (_) { } }, 1800);
     }
-    await recommend();
+    try {
+        await recommend();
+    }
+    catch (err) {
+        console.error("initial plan failed:", err);
+        $("planHint").textContent = "Engine failed to produce a plan — see console.";
+    }
 }
 init();

@@ -36,8 +36,11 @@ async function makeWasmBackend(): Promise<Backend | null> {
   try {
     const resp = await fetch("p2h.wasm");
     if (!resp.ok) return null;
-    const mod = await WebAssembly.instantiateStreaming(resp, {});
-    const e = mod.instance.exports as Record<string, any>;
+    // Use arrayBuffer + instantiate (robust on Pages: handles any MIME/encoding,
+    // unlike instantiateStreaming).
+    const bytes = await resp.arrayBuffer();
+    const { instance } = await WebAssembly.instantiate(bytes, {});
+    const e = instance.exports as Record<string, any>;
     const read = (fn:()=>number):string => {
       const ptr = fn();
       const len = e.p2h_out_len();
@@ -45,18 +48,18 @@ async function makeWasmBackend(): Promise<Backend | null> {
     };
     useWasm = true;
     return {
-      load: async () => { e.p2h_init(1337); e.p2h_run(150); },
+      load: async () => { e.p2h_init(1337n); e.p2h_run(150n); },  // u64 ⇒ BigInt
       meta: async () => JSON.parse(read(()=>e.p2h_meta())),
       state: async () => JSON.parse(read(()=>e.p2h_state())),
       recommend: async (caps:number[]) => {
         const n = 8;
-        const ptr = e.p2h_alloc_f32(n);
+        const ptr = e.p2h_alloc_f32(n);                 // pointer/len are i32 ⇒ Number fine
         new Float32Array(e.memory.buffer, ptr, n).set(caps);
         return JSON.parse(read(()=>e.p2h_recommend(ptr, n)));
       },
-      warm: (n:number) => e.p2h_run(n),
+      warm: (n:number) => e.p2h_run(BigInt(n)),         // u64 ⇒ BigInt
     };
-  } catch (_) { useWasm = false; return null; }
+  } catch (err) { console.error("wasm backend failed, falling back to HTTP:", err); useWasm = false; return null; }
 }
 
 function makeHttpBackend(): Backend {
@@ -193,16 +196,20 @@ async function init(){
   curCaps=[0.55,0.5,0.5,0.45,0.5,0.5,0.45,0.5];
 
   // Choose engine: Rust→WebAssembly in the browser, else the Rust HTTP server.
-  const wasmBackend = await makeWasmBackend();
-  backend = wasmBackend ?? makeHttpBackend();
-  await backend.load();
-
-  try { meta = await backend.meta(); } catch(_) {}
+  try {
+    const wasmBackend = await makeWasmBackend();
+    backend = wasmBackend ?? makeHttpBackend();
+    await backend.load();
+    meta = await backend.meta();
+  } catch (err) {
+    console.error("engine init failed:", err);
+    backend = makeHttpBackend();   // last-resort fallback
+  }
   if (!meta) {
     meta = { capacities:[], skills:[], weeks:36, threshold:0.8, goal:9, goalName:"Full press to handstand" } as Meta;
   }
-  buildSliders();
 
+  buildSliders();
   pollEvolution();
   evolTimer = window.setInterval(pollEvolution, 900);
   $("btnRecompute").onclick = recommend;
@@ -210,9 +217,9 @@ async function init(){
   // In wasm mode the GA runs in-browser; nudge it forward so the fitness curve
   // keeps climbing without freezing the UI (run in small chunks).
   if (useWasm) {
-    window.setInterval(() => { backend.warm(25); pollEvolution(); }, 1800);
+    window.setInterval(() => { try { backend.warm(25); pollEvolution(); } catch(_){} }, 1800);
   }
 
-  await recommend();
+  try { await recommend(); } catch (err) { console.error("initial plan failed:", err); $("planHint").textContent="Engine failed to produce a plan — see console."; }
 }
 init();
