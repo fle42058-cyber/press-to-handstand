@@ -1,0 +1,19 @@
+[package]
+name = "p2h-engine"
+version = "0.1.0"
+edition = "2021"
+
+# Intentionally zero external dependencies: the whole engine (HTTP server,
+# neural network, genetic algorithm, biomechanical simulator) is std-only so
+# it always compiles. [profile.release] tuned for the background GA loop.
+[profile.release]
+opt-level = 3
+lto = true
+
+# `rlib` for the local HTTP binary; `cdylib` so the same code compiles to a
+# browser WebAssembly module (for a static GitHub Pages build with no server).
+[lib]
+name = "p2h_engine"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]

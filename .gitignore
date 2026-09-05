@@ -1,0 +1,9 @@
+# Rust
+backend/target/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+*.log

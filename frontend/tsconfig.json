@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "none",
+    "outFile": "../backend/public/app.js",
+    "rootDir": "src",
+    "strict": true,
+    "lib": ["ES2018", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}
