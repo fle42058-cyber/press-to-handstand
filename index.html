@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#0b0e14" />
+<title>Press → Handstand · Self-Evolving Coach</title>
+<style>
+  :root{
+    --bg:#0b0e14; --card:#131a26; --card2:#0f1520; --line:#223045;
+    --txt:#e8eef5; --mut:#8aa0b8; --acc:#4fd1c5; --acc2:#7aa2ff; --good:#3ddc97;
+    --warn:#ffb454; --bad:#ef6f6c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;}
+  body{min-height:100vh;}
+  .wrap{max-width:520px;margin:0 auto;padding:16px 16px 48px;}
+  header.top{margin:6px 0 18px;}
+  h1{font-size:24px;margin:0;letter-spacing:.3px;font-weight:700;}
+  h1 .arrow{color:var(--acc);}
+  .sub{color:var(--mut);font-size:13px;margin-top:6px;line-height:1.5;}
+  .tag{display:inline-block;background:linear-gradient(90deg,rgba(79,209,197,.16),rgba(122,162,255,.16));
+    border:1px solid var(--line);color:var(--acc);font-size:11px;padding:2px 8px;border-radius:20px;
+    margin-top:8px;font-weight:600;letter-spacing:.4px;}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
+    border-radius:16px;padding:16px;margin:0 0 16px;}
+  .card h2{font-size:14px;margin:0 0 10px;letter-spacing:.5px;color:var(--acc2);
+    text-transform:uppercase;font-weight:700;}
+  .card .hint{color:var(--mut);font-size:12px;line-height:1.5;margin:0 0 8px;}
+  .statrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .stat{flex:1;min-width:96px;background:var(--card2);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px;}
+  .stat .k{font-size:11px;color:var(--mut);letter-spacing:.4px;}
+  .stat .v{font-size:22px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .stat .v.sm{font-size:18px;}
+  canvas{width:100%;height:auto;display:block;}
+  .chartlabel{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;margin-top:6px;}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:15px;font-weight:700;
+    background:linear-gradient(90deg,var(--acc),#3aa7d8);color:#04262b;cursor:pointer;margin-top:10px;}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--mut);font-weight:600;}
+  .sliderrow{margin:12px 0;}
+  .sliderrow .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .sliderrow .name{font-size:13px;font-weight:600;}
+  .sliderrow .val{font-size:13px;color:var(--acc);font-variant-numeric:tabular-nums;font-weight:700;}
+  .sliderrow .hint{font-size:11px;color:var(--mut);margin-bottom:4px;}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:6px;
+    background:linear-gradient(90deg,var(--acc) var(--p,0%),#223045 var(--p,0%));outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:#fff;border:4px solid var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.4);}
+  .plancard .goalbar{height:8px;border-radius:6px;background:#223045;overflow:hidden;margin:8px 0 2px;}
+  .plancard .goalbar > div{height:100%;background:linear-gradient(90deg,var(--wapf,#3ddc97),var(--acc));border-radius:6px;}
+  .blocks{margin-top:10px;}
+  .block{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);}
+  .block:first-child{margin-top:4px;}
+  .block .phase{min-width:74px;font-size:11px;color:var(--acc);font-weight:700;padding-top:2px;
+    font-variant-numeric:tabular-nums;}
+  .block .desc{font-size:13px;line-height:1.4;}
+  .block .focus{display:block;font-size:11px;color:var(--mut);margin-top:2px;}
+  .capsbars{margin-top:8px;}
+  .caprow{display:grid;grid-template-columns:132px 1fr 40px;align-items:center;gap:8px;margin:5px 0;}
+  .caprow .nm{font-size:11px;color:var(--mut);}
+  .caprow .bar{height:8px;background:#223045;border-radius:5px;overflow:hidden;}
+  .caprow .bar i{display:block;height:100%;background:var(--acc);border-radius:5px;}
+  .caprow .caprow .bar i.after{}
+  .caprow .lbl{font-size:11px;text-align:right;font-variant-numeric:tabular-nums;}
+  .capbar{position:relative;}
+  .b{height:8px;background:#223045;border-radius:5px;}
+  .b .a{position:absolute;height:8px;background:#5b6f8a;border-radius:5px;top:0;left:0;}
+  .b .e{position:absolute;height:8px;background:var(--acc);border-radius:5px;top:0;left:0;}
+  .footer{color:var(--mut);font-size:12px;line-height:1.6;}
+  .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-left:6px;}
+  .pill.ok{background:rgba(61,220,151,.16);color:var(--good);}
+  .pill.start{background:rgba(122,162,255,.16);color:var(--acc2);}
+  .nav{display:flex;gap:8px;margin-bottom:14px;}
+  .nav button{flex:1;border:1px solid var(--line);background:var(--card2);color:var(--mut);border-radius:12px;
+    padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
+  .nav button.on{color:var(--acc);border-color:var(--acc);background:rgba(79,209,197,.08);}
+  .hidden{display:none!important;}
+  .sourceline{font-size:11px;color:var(--mut);margin-top:10px;}
+  .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--acc);
+    animation:sp 1s linear infinite;margin:10px auto;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Press <span class="arrow">→</span> Handstand</h1>
+    <div class="sub">A <b>Rust</b> genetic algorithm evolves a small neural-network coach that optimises your training pathway toward the full press to handstand. Pure algorithms — no ML libraries.</div>
+    <span class="tag">SELF-EVOLVING · GENETIC ALGORITHM</span>
+  </header>
+
+  <div class="nav">
+    <button id="navEvo" class="on">Evolution</button>
+    <button id="navPlan">My Pathway</button>
+  </div>
+
+  <!-- EVOLUTION PANEL -->
+  <section id="secEvo">
+    <div class="card">
+      <h2>Live evolution</h2>
+      <div class="hint">The population of coach-networks is evaluated every generation in Rust and bred by tournament selection, crossover &amp; mutation. The best "fitness" (press attainment − injury cost) improves over time.</div>
+      <div class="statrow">
+        <div class="stat"><div class="k">Generation</div><div class="v" id="sGen">–</div></div>
+        <div class="stat"><div class="k">Best fitness</div><div class="v sm" id="sFit">–</div></div>
+        <div class="stat"><div class="k">Population</div><div class="v sm" id="sPop">–</div></div>
+      </div>
+      <canvas id="evoChart" width="520" height="180"></canvas>
+      <div class="chartlabel"><span>generation</span><span>best coach fitness →</span></div>
+      <button class="btn ghost" id="btnPause">Pause evolution</button>
+    </div>
+  </section>
+
+  <!-- PLAN PANEL -->
+  <section id="secPlan" class="hidden">
+    <div class="card">
+      <h2>Your profile</h2>
+      <div class="hint">Rate each attribute honestly (0–100). The coach schedules drills that raise your weakest links first.</div>
+      <div id="sliders"></div>
+      <button class="btn" id="btnRecompute">Optimise my pathway</button>
+    </div>
+
+    <div class="card plancard" id="planCard">
+      <h2>Recommended pathway <span id="planSrc" class="pill start">…</span></h2>
+      <div class="hint" id="planHint">Set your profile and press "Optimise".</div>
+      <div class="statrow">
+        <div class="stat"><div class="k">Weeks to press</div><div class="v" id="pWeeks">–</div></div>
+        <div class="stat"><div class="k">Final attainment</div><div class="v sm" id="pFinal">–</div></div>
+        <div class="stat"><div class="k">Injuries</div><div class="v sm" id="pInj">–</div></div>
+      </div>
+      <div class="goalbar"><div id="pBar" style="width:0%"></div></div>
+      <div class="chartlabel"><span>0%</span><span>press readiness →</span></div>
+      <div class="hint">Attainment over the horizon (weak-link weighted):</div>
+      <canvas id="planChart" width="520" height="150"></canvas>
+      <div id="pBlocks" class="blocks"></div>
+      <div class="hint" style="margin-top:12px">Capacity build (start → end of programme):</div>
+      <div id="capBars" class="capsbars"></div>
+      <div class="sourceline" id="pSource"></div>
+    </div>
+  </section>
+
+  <div class="card footer">
+    <b>How it works.</b> 8 physical attributes (mobility, strength, balance…) drive 10 progression drills from wall slides to the full press. A <i>genetic algorithm</i> evolves the weights of a neural-network "coach" that picks, each week, how to focus your training so the built-in progression simulator reaches the press fastest with the fewest overreach injuries. Your self-assessment personalises it. The greedy baseline guarantees a sensible curriculum while the network keeps refining.
+    <div style="margin-top:8px">Engine: <b>Rust</b> (std-only). UI: <b>TypeScript</b>. Server: <a href="/api/evolution" style="color:var(--acc)">/api/evolution</a> · <a href="/api/meta" style="color:var(--acc)">/api/meta</a> · <a href="/api/recommend" style="color:var(--acc)">/api/recommend</a></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
